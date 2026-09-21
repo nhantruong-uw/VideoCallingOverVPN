@@ -41,7 +41,7 @@ async fn ws_handler(State(state): State<SharedState>, ws: WebSocketUpgrade) -> i
 async fn handle_socket(mut socket: WebSocket, state: SharedState) {
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
-    let tx_clone = tx.clone();
+    // let tx_clone = tx.clone();
     state.lock().unwrap().insert(id, tx);
     tracing::info!("client connected");
 
@@ -60,8 +60,19 @@ async fn handle_socket(mut socket: WebSocket, state: SharedState) {
             tracing::info!("received: {text}");
         }
 
-        if tx_clone.send(msg).is_err() {
-            break;
+        // if tx_clone.send(msg).is_err() {
+        //     break;
+        // }
+
+        let map = state.lock().unwrap();
+        for (&other_id, other_tx) in map.iter() {
+            if (other_id == id) {
+                continue;
+            }
+            let msg_clone = msg.clone();
+            if other_tx.send(msg_clone).is_err() {
+                break;
+            }
         }
     }
 
