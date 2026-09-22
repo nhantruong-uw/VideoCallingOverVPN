@@ -209,8 +209,9 @@ body {
     z-index: 3;
     display: flex;
     align-items: center;
-    padding: 10px 20px;
-    background: rgba(5, 8, 13, 0.85);
+    gap: 14px;
+    padding: 10px 16px;
+    background: rgba(5, 8, 13, 0.9);
     border: 1px solid var(--accent);
     border-radius: 4px;
     box-shadow: 0 0 20px var(--accent-glow);
@@ -218,7 +219,11 @@ body {
     letter-spacing: 1px;
     text-transform: uppercase;
     color: var(--accent);
-    animation: pulse 1.8s ease-in-out infinite;
+}
+
+.incoming-call-banner button {
+    padding: 6px 14px;
+    font-size: 12px;
 }
 
 .tile::before,
@@ -394,12 +399,14 @@ button:active {
     box-shadow: 0 0 6px var(--accent-glow);
 }
 
-#disconnectBtn {
+#disconnectBtn,
+#rejectCallBtn {
     color: var(--danger);
     border-color: rgba(255, 77, 106, 0.35);
 }
 
-#disconnectBtn:hover {
+#disconnectBtn:hover,
+#rejectCallBtn:hover {
     border-color: var(--danger);
     box-shadow: 0 0 14px rgba(255, 77, 106, 0.55);
 }

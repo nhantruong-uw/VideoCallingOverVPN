@@ -13,6 +13,9 @@ let onPeerMediaState = null;
 let onQualityChange = null;
 let qualityInterval = null;
 let onIncomingCall = null;
+let onCallRejected = null;
+let pendingOffer = null;
+let pendingCandidates = [];
 
 function send(msg) {
     ws.send(JSON.stringify(msg));
@@ -28,6 +31,7 @@ export function connectSignaling({
     onPeerMediaState: mediaStateCb,
     onQualityChange: qualityCb,
     onIncomingCall: incomingCb,
+    onCallRejected: rejectedCb,
 } = {}) {
     onRemoteStream = cb;
     onCallEnded = endedCb;
@@ -38,6 +42,7 @@ export function connectSignaling({
     onPeerMediaState = mediaStateCb;
     onQualityChange = qualityCb;
     onIncomingCall = incomingCb;
+    onCallRejected = rejectedCb;
 
     return new Promise((resolve, reject) => {
         ws = new WebSocket(`wss://${location.host}/ws`);
@@ -127,6 +132,35 @@ export function hangup() {
     pc?.close();
     pc = null;
     remoteId = null;
+    pendingOffer = null;
+    pendingCandidates = [];
+}
+
+export async function acceptCall() {
+    if (!pendingOffer) return;
+    const offer = pendingOffer;
+    pendingOffer = null;
+
+    pc = createPeerConnection();
+    await pc.setRemoteDescription(new RTCSessionDescription(offer.payload));
+
+    for (const candidate of pendingCandidates) {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+    pendingCandidates = [];
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    send({ type: "answer", sender: 0, target: remoteId, payload: pc.localDescription });
+}
+
+export function rejectCall() {
+    if (!pendingOffer) return;
+    send({ type: "reject", sender: 0, target: remoteId, payload: {} });
+    pendingOffer = null;
+    pendingCandidates = [];
+    remoteId = null;
 }
 
 export function sendMediaState(kind, enabled) {
@@ -147,18 +181,26 @@ export async function call(targetId) {
 async function handleSignal(msg) {
     if (msg.type === "offer") {
         remoteId = msg.sender;
+        pendingOffer = msg;
+        pendingCandidates = [];
         onIncomingCall?.(msg.sender);
-        pc = createPeerConnection();
-
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.payload));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        send({ type: "answer", sender: 0, target: remoteId, payload: pc.localDescription });
     } else if (msg.type === "answer") {
         await pc.setRemoteDescription(new RTCSessionDescription(msg.payload));
+        for (const candidate of pendingCandidates) {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+        pendingCandidates = [];
     } else if (msg.type === "ice-candidate") {
-        await pc?.addIceCandidate(new RTCIceCandidate(msg.payload));
+        if (pc && pc.remoteDescription) {
+            await pc.addIceCandidate(new RTCIceCandidate(msg.payload));
+        } else {
+            pendingCandidates.push(msg.payload);
+        }
+    } else if (msg.type === "reject") {
+        pc?.close();
+        pc = null;
+        remoteId = null;
+        onCallRejected?.();
     } else if (msg.type === "roster") {
         onRoster?.(msg.payload);
     } else if (msg.type === "welcome") {

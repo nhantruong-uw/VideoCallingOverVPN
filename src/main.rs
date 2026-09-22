@@ -36,6 +36,7 @@ enum MessageType {
     Roster,
     Welcome,
     MediaState,
+    Reject,
 }
 
 #[derive(Serialize, Deserialize)]

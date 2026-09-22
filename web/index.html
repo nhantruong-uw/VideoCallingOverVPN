@@ -24,6 +24,8 @@
             <main class="stage" id="stage">
                 <div class="incoming-call-banner" id="incomingCallBanner" hidden>
                     <span id="incomingCallText"></span>
+                    <button id="acceptCallBtn">Accept</button>
+                    <button id="rejectCallBtn">Reject</button>
                 </div>
 
                 <div class="tile tile-primary" id="primaryTile">
@@ -69,7 +71,7 @@
 
     <script type="module">
         import { startCapture, stopCapture, getCurrentStream, toggleAudio, toggleVideo, listDevices } from "./capture.js";
-        import { connectSignaling, call, hangup, identify, sendMediaState } from "./webrtc.js";
+        import { connectSignaling, call, hangup, identify, sendMediaState, acceptCall, rejectCall } from "./webrtc.js";
 
         const statusEl = document.getElementById("status");
         const videoEl = document.getElementById("localVideo");
@@ -89,6 +91,8 @@
         const selfQualityDotEl = document.getElementById("selfQualityDot");
         const incomingCallBannerEl = document.getElementById("incomingCallBanner");
         const incomingCallTextEl = document.getElementById("incomingCallText");
+        const acceptCallBtn = document.getElementById("acceptCallBtn");
+        const rejectCallBtn = document.getElementById("rejectCallBtn");
 
         let selfId = null;
         let lastRosterPeers = [];
@@ -173,6 +177,11 @@
             const caller = lastRosterPeers.find((peer) => peer.id === callerId);
             incomingCallTextEl.textContent = `Incoming call from ${caller?.name ?? `Peer ${callerId}`}...`;
             incomingCallBannerEl.hidden = false;
+        }
+
+        function onCallRejected() {
+            incomingCallBannerEl.hidden = true;
+            statusEl.textContent = "Call declined.";
         }
 
         function clearRemoteStream() {
@@ -301,6 +310,7 @@
                 onPeerMediaState,
                 onQualityChange,
                 onIncomingCall,
+                onCallRejected,
             });
         } catch (err) {
             console.error(err);
@@ -332,6 +342,16 @@
             } else {
                 start(selectedConstraints());
             }
+        });
+
+        acceptCallBtn.addEventListener("click", () => {
+            incomingCallBannerEl.hidden = true;
+            acceptCall();
+        });
+
+        rejectCallBtn.addEventListener("click", () => {
+            incomingCallBannerEl.hidden = true;
+            rejectCall();
         });
 
         nameInput.addEventListener("change", () => {
