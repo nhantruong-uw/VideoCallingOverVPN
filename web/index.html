@@ -41,6 +41,7 @@
                 <span class="self-you">(You)</span>
                 <span id="selfOnlineText">Offline</span>
                 <span class="status-dot offline" id="selfStatusDot"></span>
+                <span class="quality-dot" id="selfQualityDot" hidden></span>
             </div>
             <div class="control-group">
                 <label for="nameInput">Name</label>
@@ -64,7 +65,7 @@
 
     <script type="module">
         import { startCapture, stopCapture, getCurrentStream, toggleAudio, toggleVideo, listDevices } from "./capture.js";
-        import { connectSignaling, call, hangup, identify } from "./webrtc.js";
+        import { connectSignaling, call, hangup, identify, sendMediaState } from "./webrtc.js";
 
         const statusEl = document.getElementById("status");
         const videoEl = document.getElementById("localVideo");
@@ -81,8 +82,14 @@
         const selfNameEl = document.getElementById("selfName");
         const selfOnlineTextEl = document.getElementById("selfOnlineText");
         const selfStatusDotEl = document.getElementById("selfStatusDot");
+        const selfQualityDotEl = document.getElementById("selfQualityDot");
 
         let selfId = null;
+        let lastRosterPeers = [];
+        let activeCallPeerId = null;
+        let currentQuality = null;
+        let peerAudioEnabled = true;
+        let peerVideoEnabled = true;
 
         function setSelfOnline(online) {
             selfOnlineTextEl.textContent = online ? "Online" : "Offline";
@@ -90,6 +97,7 @@
         }
 
         function renderRoster(peers) {
+            lastRosterPeers = peers;
             rosterListEl.innerHTML = "";
 
             const self = peers.find((peer) => peer.id === selfId);
@@ -125,16 +133,33 @@
                     li.appendChild(dot);
                     li.appendChild(nameEl);
                     li.appendChild(idEl);
+
+                    if (peer.id === activeCallPeerId && currentQuality) {
+                        const qualityDot = document.createElement("span");
+                        qualityDot.className = `quality-dot ${currentQuality}`;
+                        li.appendChild(qualityDot);
+                    }
+
                     li.appendChild(callPeerBtn);
 
                     rosterListEl.appendChild(li);
                 });
         }
 
+        function updateRemoteLabel() {
+            let text = "Peer";
+            if (!peerAudioEnabled) text += " · Muted";
+            if (!peerVideoEnabled) text += " · Camera off";
+            remoteLabelEl.innerHTML = `<span class="live-dot"></span>${text}`;
+        }
+
         function showRemoteStream(stream) {
             remoteVideoEl.srcObject = stream;
             remoteLabelEl.hidden = false;
             primaryPlaceholderEl.hidden = true;
+            peerAudioEnabled = true;
+            peerVideoEnabled = true;
+            updateRemoteLabel();
         }
 
         function clearRemoteStream() {
@@ -150,6 +175,24 @@
                 : "";
         }
 
+        function onPeerMediaState(kind, enabled) {
+            if (kind === "audio") peerAudioEnabled = enabled;
+            if (kind === "video") peerVideoEnabled = enabled;
+            updateRemoteLabel();
+        }
+
+        function onQualityChange(quality, peerId) {
+            currentQuality = quality;
+            activeCallPeerId = peerId;
+
+            selfQualityDotEl.hidden = quality === null;
+            if (quality !== null) {
+                selfQualityDotEl.className = `quality-dot ${quality}`;
+            }
+
+            renderRoster(lastRosterPeers);
+        }
+
         async function start(constraints) {
             try {
                 const stream = await startCapture(constraints, {
@@ -163,6 +206,8 @@
                 muteBtn.textContent = "Mute";
                 cameraBtn.textContent = "Turn Camera Off";
                 disconnectBtn.textContent = "Disconnect";
+                micSelect.classList.remove("av-disabled");
+                cameraSelect.classList.remove("av-disabled");
             } catch (err) {
                 console.error(err);
 
@@ -189,6 +234,8 @@
             cameraBtn.textContent = "Turn Camera Off";
             disconnectBtn.textContent = "Start Camera";
             statusEl.textContent = "Disconnected.";
+            micSelect.classList.remove("av-disabled");
+            cameraSelect.classList.remove("av-disabled");
         }
 
         async function populateDeviceLists() {
@@ -237,6 +284,8 @@
                 onWelcome: (id) => { selfId = id; },
                 onSignalingClosed: () => setSelfOnline(false),
                 onRemoteTrackMuted,
+                onPeerMediaState,
+                onQualityChange,
             });
         } catch (err) {
             console.error(err);
@@ -250,12 +299,16 @@
             const enabled = toggleAudio();
             if (enabled === null) return;
             muteBtn.textContent = enabled ? "Mute" : "Unmute";
+            micSelect.classList.toggle("av-disabled", !enabled);
+            sendMediaState("audio", enabled);
         });
 
         cameraBtn.addEventListener("click", () => {
             const enabled = toggleVideo();
             if (enabled === null) return;
             cameraBtn.textContent = enabled ? "Turn Camera Off" : "Turn Camera On";
+            cameraSelect.classList.toggle("av-disabled", !enabled);
+            sendMediaState("video", enabled);
         });
 
         disconnectBtn.addEventListener("click", () => {
