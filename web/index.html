@@ -179,6 +179,10 @@
             statusEl.textContent = `Calling ${target?.name ?? `Peer ${targetId}`}...`;
         }
 
+        function onCallBusy() {
+            statusEl.textContent = "Peer is busy.";
+        }
+
         function onIncomingCall(callerId) {
             const caller = lastRosterPeers.find((peer) => peer.id === callerId);
             incomingCallTextEl.textContent = `Incoming call from ${caller?.name ?? `Peer ${callerId}`}...`;
@@ -318,6 +322,7 @@
                 onIncomingCall,
                 onCallRejected,
                 onCallRinging,
+                onCallBusy,
             });
         } catch (err) {
             console.error(err);

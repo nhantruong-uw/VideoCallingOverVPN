@@ -15,6 +15,7 @@ let qualityInterval = null;
 let onIncomingCall = null;
 let onCallRejected = null;
 let onCallRinging = null;
+let onCallBusy = null;
 let pendingOffer = null;
 let pendingCandidates = [];
 
@@ -34,6 +35,7 @@ export function connectSignaling({
     onIncomingCall: incomingCb,
     onCallRejected: rejectedCb,
     onCallRinging: ringingCb,
+    onCallBusy: busyCb,
 } = {}) {
     onRemoteStream = cb;
     onCallEnded = endedCb;
@@ -46,6 +48,7 @@ export function connectSignaling({
     onIncomingCall = incomingCb;
     onCallRejected = rejectedCb;
     onCallRinging = ringingCb;
+    onCallBusy = busyCb;
 
     return new Promise((resolve, reject) => {
         ws = new WebSocket(`wss://${location.host}/ws`);
@@ -132,6 +135,9 @@ export function identify(name) {
 
 export function hangup() {
     stopQualityMonitor();
+    if (remoteId !== null) {
+        send({ type: "hangup", sender: 0, target: remoteId, payload: {} });
+    }
     pc?.close();
     pc = null;
     remoteId = null;
@@ -184,6 +190,11 @@ export async function call(targetId) {
 
 async function handleSignal(msg) {
     if (msg.type === "offer") {
+        if (pc !== null || pendingOffer !== null) {
+            send({ type: "busy", sender: 0, target: msg.sender, payload: {} });
+            return;
+        }
+
         remoteId = msg.sender;
         pendingOffer = msg;
         pendingCandidates = [];
@@ -205,11 +216,24 @@ async function handleSignal(msg) {
         pc = null;
         remoteId = null;
         onCallRejected?.();
+    } else if (msg.type === "hangup") {
+        stopQualityMonitor();
+        pc?.close();
+        pc = null;
+        remoteId = null;
+        pendingOffer = null;
+        pendingCandidates = [];
+        onCallEnded?.();
     } else if (msg.type === "roster") {
         onRoster?.(msg.payload);
     } else if (msg.type === "welcome") {
         onWelcome?.(msg.payload.id);
     } else if (msg.type === "media-state") {
         onPeerMediaState?.(msg.payload.kind, msg.payload.enabled);
+    } else if (msg.type === "busy") {
+        pc?.close();
+        pc = null;
+        remoteId = null;
+        onCallBusy?.();
     }
 }
