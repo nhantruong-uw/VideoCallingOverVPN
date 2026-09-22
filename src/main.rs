@@ -34,6 +34,7 @@ enum MessageType {
     IceCandidate,
     Identify,
     Roster,
+    Welcome,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -116,6 +117,15 @@ async fn ws_handler(State(state): State<SharedState>, ws: WebSocketUpgrade) -> i
 async fn handle_socket(mut socket: WebSocket, state: SharedState) {
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
+
+    let welcome = SignalMessage {
+        msg_type: MessageType::Welcome,
+        sender: 0,
+        target: id,
+        payload: serde_json::json!({ "id": id }),
+    };
+    let _ = tx.send(Message::Text(serde_json::to_string(&welcome).unwrap().into()));
+
     state.lock().unwrap().insert(
         id,
         ClientInfo {

@@ -6,20 +6,31 @@ let remoteId = null;
 let onRemoteStream = null;
 let onCallEnded = null;
 let onRoster = null;
+let onWelcome = null;
+let onSignalingClosed = null;
 
 function send(msg) {
     ws.send(JSON.stringify(msg));
 }
 
-export function connectSignaling({ onRemoteStream: cb, onCallEnded: endedCb, onRoster: rosterCb } = {}) {
+export function connectSignaling({
+    onRemoteStream: cb,
+    onCallEnded: endedCb,
+    onRoster: rosterCb,
+    onWelcome: welcomeCb,
+    onSignalingClosed: closedCb,
+} = {}) {
     onRemoteStream = cb;
     onCallEnded = endedCb;
     onRoster = rosterCb;
+    onWelcome = welcomeCb;
+    onSignalingClosed = closedCb;
 
     return new Promise((resolve, reject) => {
         ws = new WebSocket(`wss://${location.host}/ws`);
         ws.onopen = () => resolve();
         ws.onerror = (err) => reject(err);
+        ws.onclose = () => onSignalingClosed?.();
         ws.onmessage = (event) => handleSignal(JSON.parse(event.data));
     });
 }
@@ -85,5 +96,7 @@ async function handleSignal(msg) {
         await pc?.addIceCandidate(new RTCIceCandidate(msg.payload));
     } else if (msg.type === "roster") {
         onRoster?.(msg.payload);
+    } else if (msg.type === "welcome") {
+        onWelcome?.(msg.payload.id);
     }
 }

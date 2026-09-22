@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>video-calling-over-vpn</title>
+    <title>Spectre</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
 <body>
     <div class="app">
         <div class="topbar">
-            <h1>video-calling-over-vpn</h1>
+            <h1>Spectre</h1>
             <p class="status-line" id="status"></p>
         </div>
 
@@ -30,6 +30,12 @@
         </div>
 
         <footer class="controls">
+            <div class="control-group self-status">
+                <span id="selfName">You</span>
+                <span class="self-you">(You)</span>
+                <span id="selfOnlineText">Offline</span>
+                <span class="status-dot offline" id="selfStatusDot"></span>
+            </div>
             <div class="control-group">
                 <label for="nameInput">Name</label>
                 <input type="text" id="nameInput" placeholder="Your name">
@@ -46,11 +52,6 @@
                 <button id="muteBtn">Mute</button>
                 <button id="cameraBtn">Turn Camera Off</button>
                 <button id="disconnectBtn">Disconnect</button>
-            </div>
-            <div class="control-group">
-                <label for="targetInput">Target ID</label>
-                <input type="number" id="targetInput" min="0" step="1">
-                <button id="callBtn" disabled>Call</button>
             </div>
         </footer>
     </div>
@@ -69,13 +70,28 @@
         const muteBtn = document.getElementById("muteBtn");
         const cameraBtn = document.getElementById("cameraBtn");
         const disconnectBtn = document.getElementById("disconnectBtn");
-        const targetInput = document.getElementById("targetInput");
-        const callBtn = document.getElementById("callBtn");
+        const selfNameEl = document.getElementById("selfName");
+        const selfOnlineTextEl = document.getElementById("selfOnlineText");
+        const selfStatusDotEl = document.getElementById("selfStatusDot");
+
+        let selfId = null;
+
+        function setSelfOnline(online) {
+            selfOnlineTextEl.textContent = online ? "Online" : "Offline";
+            selfStatusDotEl.className = `status-dot ${online ? "online" : "offline"}`;
+        }
 
         function renderRoster(peers) {
             rosterListEl.innerHTML = "";
 
+            const self = peers.find((peer) => peer.id === selfId);
+            if (self) {
+                selfNameEl.textContent = self.name;
+                setSelfOnline(self.online);
+            }
+
             peers
+                .filter((peer) => peer.id !== selfId)
                 .sort((a, b) => a.id - b.id)
                 .forEach((peer) => {
                     const li = document.createElement("li");
@@ -84,13 +100,24 @@
                     const dot = document.createElement("span");
                     dot.className = `status-dot ${peer.online ? "online" : "offline"}`;
 
-                    li.appendChild(dot);
-                    li.append(`${peer.name} `);
+                    const nameEl = document.createElement("span");
+                    nameEl.className = "roster-name";
+                    nameEl.textContent = `${peer.name} `;
 
                     const idEl = document.createElement("span");
                     idEl.className = "roster-id";
                     idEl.textContent = `#${peer.id}`;
+
+                    const callPeerBtn = document.createElement("button");
+                    callPeerBtn.className = "roster-call-btn";
+                    callPeerBtn.textContent = "Call";
+                    callPeerBtn.disabled = !peer.online;
+                    callPeerBtn.addEventListener("click", () => call(peer.id));
+
+                    li.appendChild(dot);
+                    li.appendChild(nameEl);
                     li.appendChild(idEl);
+                    li.appendChild(callPeerBtn);
 
                     rosterListEl.appendChild(li);
                 });
@@ -200,18 +227,17 @@
         await populateDeviceLists();
 
         try {
-            await connectSignaling({ onRemoteStream: addRemoteTile, onCallEnded: clearRemoteTiles, onRoster: renderRoster });
-            callBtn.disabled = false;
+            await connectSignaling({
+                onRemoteStream: addRemoteTile,
+                onCallEnded: clearRemoteTiles,
+                onRoster: renderRoster,
+                onWelcome: (id) => { selfId = id; },
+                onSignalingClosed: () => setSelfOnline(false),
+            });
         } catch (err) {
             console.error(err);
             statusEl.textContent = "Could not connect to the signaling server.";
         }
-
-        callBtn.addEventListener("click", () => {
-            const targetId = parseInt(targetInput.value, 10);
-            if (Number.isNaN(targetId)) return;
-            call(targetId);
-        });
 
         cameraSelect.addEventListener("change", () => start(selectedConstraints()));
         micSelect.addEventListener("change", () => start(selectedConstraints()));

@@ -7,6 +7,7 @@
     --text: #d9f8ff;
     --text-dim: #5f8494;
     --danger: #ff4d6a;
+    --online: #3ddc73;
 }
 
 * {
@@ -116,13 +117,21 @@ body {
 }
 
 .status-dot.online {
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent-glow);
-    animation: pulse 1.8s ease-in-out infinite;
+    background: var(--online);
+    box-shadow: 0 0 6px rgba(61, 220, 115, 0.5);
 }
 
 .status-dot.offline {
     background: var(--text-dim);
+}
+
+.roster-name {
+    flex: 1;
+}
+
+.roster-call-btn {
+    padding: 4px 10px;
+    font-size: 11px;
 }
 
 .stage {
@@ -233,6 +242,18 @@ body {
     color: var(--text-dim);
 }
 
+.self-status {
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding-right: 20px;
+    border-right: 1px solid var(--accent-dim);
+}
+
+.self-you {
+    color: var(--text-dim);
+}
+
 select,
 input {
     background: var(--bg-panel);
@@ -243,10 +264,6 @@ input {
     font-family: "Rajdhani", sans-serif;
     font-size: 13px;
     max-width: 220px;
-}
-
-input#targetInput {
-    width: 70px;
 }
 
 select:focus,
