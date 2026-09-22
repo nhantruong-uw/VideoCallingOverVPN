@@ -1,12 +1,29 @@
 <!DOCTYPE html>
 <html>
     <script type="module">
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true});
-        document.getElementById("localVideo").srcObject = stream;
+        const statusEl = document.getElementById("status");
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById("localVideo").srcObject = stream;
+        } catch (err) {
+            console.error(err);
+
+            if (err.name === "NotAllowedError") {
+                statusEl.textContent = "Camera/mic access was denied. Please allow access and reload the page.";
+            } else if (err.name === "NotFoundError") {
+                statusEl.textContent = "No camera or microphone was found on this device.";
+            } else if (err.name === "NotReadableError") {
+                statusEl.textContent = "Your camera or mic is already in use by another application.";
+            } else if (err.name === "OverconstrainedError") {
+                statusEl.textContent = "No device matches the requested settings.";
+            } else {
+                statusEl.textContent = `Could not access camera/mic: ${err.name}`;
+            }
+        }
     </script>
     <body>
-        <video id="localVideo" autoplay muted playsinline>
-
-        </video>
+        <video id="localVideo" autoplay muted playsinline></video>
+        <p id="status"></p>
     </body>
 </html>
