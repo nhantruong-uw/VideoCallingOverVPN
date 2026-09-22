@@ -10,11 +10,21 @@ use tokio::sync::mpsc::UnboundedSender;
 use std::sync::atomic::{AtomicU64, Ordering};
 use axum::extract::State;
 use futures_util::{SinkExt, StreamExt};
+use serde::{Serialize, Deserialize};
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
 type ClientId = u64;
 type SharedState = Arc<Mutex<HashMap<ClientId, UnboundedSender<Message>>>>;
+
+#[derive(Serialize, Deserialize)]
+struct SignalMessage {
+    #[serde(rename = "type")]
+    msg_type: String,
+    sender: ClientId,
+    target: ClientId,
+    payload: serde_json::Value,
+}
 
 #[tokio::main]
 async fn main() {
@@ -57,21 +67,28 @@ async fn handle_socket(mut socket: WebSocket, state: SharedState) {
 
     while let Some(Ok(msg)) = receiver.next().await {
         if let Message::Text(text) = &msg {
-            tracing::info!("received: {text}");
-        }
-
-        // if tx_clone.send(msg).is_err() {
-        //     break;
-        // }
-
-        let map = state.lock().unwrap();
-        for (&other_id, other_tx) in map.iter() {
-            if (other_id == id) {
-                continue;
-            }
-            let msg_clone = msg.clone();
-            if other_tx.send(msg_clone).is_err() {
-                break;
+            match serde_json::from_str::<SignalMessage>(text) {
+                Ok(mut signal) => {
+                    // good signal
+                    signal.sender = id;
+                    let pkg = Message::Text(serde_json::to_string(&signal).unwrap().into());
+                    let map = state.lock().unwrap();
+                    let other_tx = map.get(&signal.target);
+                    match other_tx {
+                        Some(tx) => {
+                            if tx.send(pkg).is_err() {
+                                tracing::warn!("failed to deliver to {}", signal.target);
+                            }
+                        }
+                        None => {
+                            tracing::warn!("target {} not connected", signal.target);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("failed to parse message: {e}");
+                    continue;
+                }
             }
         }
     }
