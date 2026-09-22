@@ -14,6 +14,7 @@ let onQualityChange = null;
 let qualityInterval = null;
 let onIncomingCall = null;
 let onCallRejected = null;
+let onCallRinging = null;
 let pendingOffer = null;
 let pendingCandidates = [];
 
@@ -32,6 +33,7 @@ export function connectSignaling({
     onQualityChange: qualityCb,
     onIncomingCall: incomingCb,
     onCallRejected: rejectedCb,
+    onCallRinging: ringingCb,
 } = {}) {
     onRemoteStream = cb;
     onCallEnded = endedCb;
@@ -43,6 +45,7 @@ export function connectSignaling({
     onQualityChange = qualityCb;
     onIncomingCall = incomingCb;
     onCallRejected = rejectedCb;
+    onCallRinging = ringingCb;
 
     return new Promise((resolve, reject) => {
         ws = new WebSocket(`wss://${location.host}/ws`);
@@ -170,6 +173,7 @@ export function sendMediaState(kind, enabled) {
 
 export async function call(targetId) {
     remoteId = targetId;
+    onCallRinging?.(targetId);
     pc = createPeerConnection();
 
     const offer = await pc.createOffer();

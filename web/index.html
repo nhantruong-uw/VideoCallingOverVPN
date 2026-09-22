@@ -168,9 +168,15 @@
             remoteLabelEl.hidden = false;
             primaryPlaceholderEl.hidden = true;
             incomingCallBannerEl.hidden = true;
+            statusEl.textContent = "";
             peerAudioEnabled = true;
             peerVideoEnabled = true;
             updateRemoteLabel();
+        }
+
+        function onCallRinging(targetId) {
+            const target = lastRosterPeers.find((peer) => peer.id === targetId);
+            statusEl.textContent = `Calling ${target?.name ?? `Peer ${targetId}`}...`;
         }
 
         function onIncomingCall(callerId) {
@@ -311,6 +317,7 @@
                 onQualityChange,
                 onIncomingCall,
                 onCallRejected,
+                onCallRinging,
             });
         } catch (err) {
             console.error(err);
