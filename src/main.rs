@@ -17,10 +17,18 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 type ClientId = u64;
 type SharedState = Arc<Mutex<HashMap<ClientId, UnboundedSender<Message>>>>;
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+enum MessageType {
+    Offer,
+    Answer,
+    IceCandidate,
+}
+
 #[derive(Serialize, Deserialize)]
 struct SignalMessage {
     #[serde(rename = "type")]
-    msg_type: String,
+    msg_type: MessageType,
     sender: ClientId,
     target: ClientId,
     payload: serde_json::Value,
