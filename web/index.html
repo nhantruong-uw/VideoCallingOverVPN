@@ -7,6 +7,7 @@
         const micSelect = document.getElementById("micSelect");
         const muteBtn = document.getElementById("muteBtn");
         const cameraBtn = document.getElementById("cameraBtn");
+        const stopBtn = document.getElementById("stopBtn");
 
         let currentStream = null;
 
@@ -23,6 +24,12 @@
                 statusEl.textContent = "";
                 muteBtn.textContent = "Mute";
                 cameraBtn.textContent = "Turn Camera Off";
+
+                stream.getTracks().forEach((track) => {
+                    track.onended = () => {
+                        statusEl.textContent = `Your ${track.kind} device disconnected unexpectedly.`;
+                    };
+                });
             } catch (err) {
                 console.error(err);
 
@@ -59,6 +66,17 @@
             });
         }
 
+        function stopStream() {
+            if (!currentStream) return;
+
+            currentStream.getTracks().forEach((track) => track.stop());
+            currentStream = null;
+            videoEl.srcObject = null;
+            statusEl.textContent = "Camera and microphone stopped.";
+            muteBtn.textContent = "Mute";
+            cameraBtn.textContent = "Turn Camera Off";
+        }
+
         function selectedConstraints() {
             return {
                 video: cameraSelect.value ? { deviceId: { exact: cameraSelect.value } } : true,
@@ -87,6 +105,9 @@
             videoTrack.enabled = !videoTrack.enabled;
             cameraBtn.textContent = videoTrack.enabled ? "Turn Camera Off" : "Turn Camera On";
         });
+
+        stopBtn.addEventListener("click", stopStream);
+        window.addEventListener("pagehide", stopStream);
     </script>
     <body>
         <video id="localVideo" autoplay muted playsinline></video>
@@ -103,5 +124,6 @@
 
         <button id="muteBtn">Mute</button>
         <button id="cameraBtn">Turn Camera Off</button>
+        <button id="stopBtn">Stop Camera</button>
     </body>
 </html>
