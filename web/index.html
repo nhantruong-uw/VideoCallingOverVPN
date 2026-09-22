@@ -1,6 +1,47 @@
 <!DOCTYPE html>
 <html>
+<head>
+    <meta charset="utf-8" />
+    <title>video-calling-over-vpn</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <div class="topbar">
+            <h1>video-calling-over-vpn</h1>
+            <p class="status-line" id="status"></p>
+        </div>
+
+        <main class="stage" id="stage">
+            <div class="tile" id="tile-local">
+                <video id="localVideo" autoplay muted playsinline></video>
+                <div class="tile-label"><span class="live-dot"></span>You</div>
+            </div>
+        </main>
+
+        <footer class="controls">
+            <div class="control-group">
+                <label for="cameraSelect">Camera</label>
+                <select id="cameraSelect"></select>
+            </div>
+            <div class="control-group">
+                <label for="micSelect">Mic</label>
+                <select id="micSelect"></select>
+            </div>
+            <div class="control-group">
+                <button id="muteBtn">Mute</button>
+                <button id="cameraBtn">Turn Camera Off</button>
+                <button id="stopBtn">Stop Camera</button>
+            </div>
+        </footer>
+    </div>
+
     <script type="module">
+        import { startCapture, stopCapture, toggleAudio, toggleVideo, listDevices } from "./capture.js";
+
         const statusEl = document.getElementById("status");
         const videoEl = document.getElementById("localVideo");
         const cameraSelect = document.getElementById("cameraSelect");
@@ -9,27 +50,18 @@
         const cameraBtn = document.getElementById("cameraBtn");
         const stopBtn = document.getElementById("stopBtn");
 
-        let currentStream = null;
-
-        async function startStream(constraints) {
+        async function start(constraints) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const stream = await startCapture(constraints, {
+                    onDeviceEnded: (track) => {
+                        statusEl.textContent = `Your ${track.kind} device disconnected unexpectedly.`;
+                    },
+                });
 
-                if (currentStream) {
-                    currentStream.getTracks().forEach((track) => track.stop());
-                }
-
-                currentStream = stream;
                 videoEl.srcObject = stream;
                 statusEl.textContent = "";
                 muteBtn.textContent = "Mute";
                 cameraBtn.textContent = "Turn Camera Off";
-
-                stream.getTracks().forEach((track) => {
-                    track.onended = () => {
-                        statusEl.textContent = `Your ${track.kind} device disconnected unexpectedly.`;
-                    };
-                });
             } catch (err) {
                 console.error(err);
 
@@ -47,34 +79,33 @@
             }
         }
 
-        async function populateDeviceLists() {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-
-            cameraSelect.innerHTML = "";
-            micSelect.innerHTML = "";
-
-            devices.forEach((device) => {
-                const option = document.createElement("option");
-                option.value = device.deviceId;
-                option.textContent = device.label || `${device.kind} (${device.deviceId.slice(0, 8)})`;
-
-                if (device.kind === "videoinput") {
-                    cameraSelect.appendChild(option);
-                } else if (device.kind === "audioinput") {
-                    micSelect.appendChild(option);
-                }
-            });
-        }
-
-        function stopStream() {
-            if (!currentStream) return;
-
-            currentStream.getTracks().forEach((track) => track.stop());
-            currentStream = null;
+        function stop() {
+            stopCapture();
             videoEl.srcObject = null;
             statusEl.textContent = "Camera and microphone stopped.";
             muteBtn.textContent = "Mute";
             cameraBtn.textContent = "Turn Camera Off";
+        }
+
+        async function populateDeviceLists() {
+            const { cameras, mics } = await listDevices();
+
+            cameraSelect.innerHTML = "";
+            micSelect.innerHTML = "";
+
+            cameras.forEach((device) => {
+                const option = document.createElement("option");
+                option.value = device.deviceId;
+                option.textContent = device.label || `camera (${device.deviceId.slice(0, 8)})`;
+                cameraSelect.appendChild(option);
+            });
+
+            mics.forEach((device) => {
+                const option = document.createElement("option");
+                option.value = device.deviceId;
+                option.textContent = device.label || `mic (${device.deviceId.slice(0, 8)})`;
+                micSelect.appendChild(option);
+            });
         }
 
         function selectedConstraints() {
@@ -84,46 +115,25 @@
             };
         }
 
-        await startStream({ video: true, audio: true });
+        await start({ video: true, audio: true });
         await populateDeviceLists();
 
-        cameraSelect.addEventListener("change", () => startStream(selectedConstraints()));
-        micSelect.addEventListener("change", () => startStream(selectedConstraints()));
+        cameraSelect.addEventListener("change", () => start(selectedConstraints()));
+        micSelect.addEventListener("change", () => start(selectedConstraints()));
 
         muteBtn.addEventListener("click", () => {
-            const audioTrack = currentStream?.getAudioTracks()[0];
-            if (!audioTrack) return;
-
-            audioTrack.enabled = !audioTrack.enabled;
-            muteBtn.textContent = audioTrack.enabled ? "Mute" : "Unmute";
+            const enabled = toggleAudio();
+            if (enabled === null) return;
+            muteBtn.textContent = enabled ? "Mute" : "Unmute";
         });
 
         cameraBtn.addEventListener("click", () => {
-            const videoTrack = currentStream?.getVideoTracks()[0];
-            if (!videoTrack) return;
-
-            videoTrack.enabled = !videoTrack.enabled;
-            cameraBtn.textContent = videoTrack.enabled ? "Turn Camera Off" : "Turn Camera On";
+            const enabled = toggleVideo();
+            if (enabled === null) return;
+            cameraBtn.textContent = enabled ? "Turn Camera Off" : "Turn Camera On";
         });
 
-        stopBtn.addEventListener("click", stopStream);
-        window.addEventListener("pagehide", stopStream);
+        stopBtn.addEventListener("click", stop);
     </script>
-    <body>
-        <video id="localVideo" autoplay muted playsinline></video>
-        <p id="status"></p>
-
-        <label>
-            Camera:
-            <select id="cameraSelect"></select>
-        </label>
-        <label>
-            Microphone:
-            <select id="micSelect"></select>
-        </label>
-
-        <button id="muteBtn">Mute</button>
-        <button id="cameraBtn">Turn Camera Off</button>
-        <button id="stopBtn">Stop Camera</button>
-    </body>
+</body>
 </html>

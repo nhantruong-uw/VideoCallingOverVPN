@@ -1,0 +1,224 @@
+:root {
+    --bg: #05080d;
+    --bg-panel: #0a121b;
+    --accent: #38e8ff;
+    --accent-dim: rgba(56, 232, 255, 0.35);
+    --accent-glow: rgba(56, 232, 255, 0.55);
+    --text: #d9f8ff;
+    --text-dim: #5f8494;
+    --danger: #ff4d6a;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Rajdhani", sans-serif;
+    overflow: hidden;
+}
+
+body {
+    background-image:
+        radial-gradient(ellipse at 50% 0%, rgba(56, 232, 255, 0.08), transparent 60%),
+        repeating-linear-gradient(0deg, rgba(56, 232, 255, 0.03) 0px, rgba(56, 232, 255, 0.03) 1px, transparent 1px, transparent 3px);
+}
+
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--accent-dim);
+}
+
+.topbar h1 {
+    font-family: "Orbitron", sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    margin: 0;
+    color: var(--accent);
+    text-shadow: 0 0 12px var(--accent-glow);
+}
+
+.status-line {
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    min-height: 1em;
+}
+
+.status-line:not(:empty) {
+    color: var(--accent);
+}
+
+.stage {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    justify-content: center;
+    align-content: center;
+    gap: 20px;
+    padding: 24px;
+    overflow: auto;
+}
+
+.tile {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    max-width: 640px;
+    justify-self: center;
+    background: var(--bg-panel);
+    border: 1px solid var(--accent-dim);
+    border-radius: 4px;
+    box-shadow: 0 0 24px rgba(56, 232, 255, 0.12), inset 0 0 40px rgba(56, 232, 255, 0.04);
+    overflow: hidden;
+}
+
+.tile video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.tile::before,
+.tile::after {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+}
+
+.tile::before {
+    top: 0;
+    left: 0;
+    border-top: 2px solid var(--accent);
+    border-left: 2px solid var(--accent);
+}
+
+.tile::after {
+    bottom: 0;
+    right: 0;
+    border-bottom: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
+}
+
+.tile-label {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(5, 8, 13, 0.65);
+    border: 1px solid var(--accent-dim);
+    border-radius: 3px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    backdrop-filter: blur(2px);
+}
+
+.live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+    animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    flex-wrap: wrap;
+    padding: 18px 24px;
+    border-top: 1px solid var(--accent-dim);
+    background: linear-gradient(180deg, transparent, rgba(56, 232, 255, 0.03));
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.control-group label {
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+select {
+    background: var(--bg-panel);
+    color: var(--text);
+    border: 1px solid var(--accent-dim);
+    border-radius: 3px;
+    padding: 7px 10px;
+    font-family: "Rajdhani", sans-serif;
+    font-size: 13px;
+    max-width: 220px;
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+button {
+    position: relative;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 9px 18px;
+    font-family: "Rajdhani", sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transition: box-shadow 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 14px var(--accent-glow);
+}
+
+button:active {
+    box-shadow: 0 0 6px var(--accent-glow);
+}
+
+#stopBtn {
+    color: var(--danger);
+    border-color: rgba(255, 77, 106, 0.35);
+}
+
+#stopBtn:hover {
+    border-color: var(--danger);
+    box-shadow: 0 0 14px rgba(255, 77, 106, 0.55);
+}
