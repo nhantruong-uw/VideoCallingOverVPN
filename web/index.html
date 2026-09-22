@@ -2,28 +2,83 @@
 <html>
     <script type="module">
         const statusEl = document.getElementById("status");
+        const videoEl = document.getElementById("localVideo");
+        const cameraSelect = document.getElementById("cameraSelect");
+        const micSelect = document.getElementById("micSelect");
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            document.getElementById("localVideo").srcObject = stream;
-        } catch (err) {
-            console.error(err);
+        let currentStream = null;
 
-            if (err.name === "NotAllowedError") {
-                statusEl.textContent = "Camera/mic access was denied. Please allow access and reload the page.";
-            } else if (err.name === "NotFoundError") {
-                statusEl.textContent = "No camera or microphone was found on this device.";
-            } else if (err.name === "NotReadableError") {
-                statusEl.textContent = "Your camera or mic is already in use by another application.";
-            } else if (err.name === "OverconstrainedError") {
-                statusEl.textContent = "No device matches the requested settings.";
-            } else {
-                statusEl.textContent = `Could not access camera/mic: ${err.name}`;
+        async function startStream(constraints) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                if (currentStream) {
+                    currentStream.getTracks().forEach((track) => track.stop());
+                }
+
+                currentStream = stream;
+                videoEl.srcObject = stream;
+                statusEl.textContent = "";
+            } catch (err) {
+                console.error(err);
+
+                if (err.name === "NotAllowedError") {
+                    statusEl.textContent = "Camera/mic access was denied. Please allow access and reload the page.";
+                } else if (err.name === "NotFoundError") {
+                    statusEl.textContent = "No camera or microphone was found on this device.";
+                } else if (err.name === "NotReadableError") {
+                    statusEl.textContent = "Your camera or mic is already in use by another application.";
+                } else if (err.name === "OverconstrainedError") {
+                    statusEl.textContent = "No device matches the requested settings.";
+                } else {
+                    statusEl.textContent = `Could not access camera/mic: ${err.name}`;
+                }
             }
         }
+
+        async function populateDeviceLists() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+
+            cameraSelect.innerHTML = "";
+            micSelect.innerHTML = "";
+
+            devices.forEach((device) => {
+                const option = document.createElement("option");
+                option.value = device.deviceId;
+                option.textContent = device.label || `${device.kind} (${device.deviceId.slice(0, 8)})`;
+
+                if (device.kind === "videoinput") {
+                    cameraSelect.appendChild(option);
+                } else if (device.kind === "audioinput") {
+                    micSelect.appendChild(option);
+                }
+            });
+        }
+
+        function selectedConstraints() {
+            return {
+                video: cameraSelect.value ? { deviceId: { exact: cameraSelect.value } } : true,
+                audio: micSelect.value ? { deviceId: { exact: micSelect.value } } : true,
+            };
+        }
+
+        await startStream({ video: true, audio: true });
+        await populateDeviceLists();
+
+        cameraSelect.addEventListener("change", () => startStream(selectedConstraints()));
+        micSelect.addEventListener("change", () => startStream(selectedConstraints()));
     </script>
     <body>
         <video id="localVideo" autoplay muted playsinline></video>
         <p id="status"></p>
+
+        <label>
+            Camera:
+            <select id="cameraSelect"></select>
+        </label>
+        <label>
+            Microphone:
+            <select id="micSelect"></select>
+        </label>
     </body>
 </html>
