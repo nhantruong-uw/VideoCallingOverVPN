@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use axum::extract::State;
 use futures_util::{SinkExt, StreamExt};
 use serde::{Serialize, Deserialize};
+use tower_http::services::ServeDir;
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -42,7 +43,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/ws", get(ws_handler))
-        .with_state(state);
+        .with_state(state)
+        .fallback_service(ServeDir::new("web"));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
