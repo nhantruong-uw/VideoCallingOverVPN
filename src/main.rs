@@ -79,6 +79,8 @@ async fn handle_socket(mut socket: WebSocket, state: SharedState) {
                 Ok(mut signal) => {
                     // good signal
                     signal.sender = id;
+                    tracing::info!("relaying {:?} from {} to {}", 
+                        signal.msg_type, id, signal.target);
                     let pkg = Message::Text(serde_json::to_string(&signal).unwrap().into());
                     let map = state.lock().unwrap();
                     let other_tx = map.get(&signal.target);
