@@ -8,6 +8,7 @@ let onCallEnded = null;
 let onRoster = null;
 let onWelcome = null;
 let onSignalingClosed = null;
+let onRemoteTrackMuted = null;
 
 function send(msg) {
     ws.send(JSON.stringify(msg));
@@ -19,12 +20,14 @@ export function connectSignaling({
     onRoster: rosterCb,
     onWelcome: welcomeCb,
     onSignalingClosed: closedCb,
+    onRemoteTrackMuted: trackMutedCb,
 } = {}) {
     onRemoteStream = cb;
     onCallEnded = endedCb;
     onRoster = rosterCb;
     onWelcome = welcomeCb;
     onSignalingClosed = closedCb;
+    onRemoteTrackMuted = trackMutedCb;
 
     return new Promise((resolve, reject) => {
         ws = new WebSocket(`wss://${location.host}/ws`);
@@ -46,6 +49,9 @@ function createPeerConnection() {
 
     conn.ontrack = (event) => {
         onRemoteStream?.(event.streams[0]);
+
+        event.track.onmute = () => onRemoteTrackMuted?.(event.track.kind, true);
+        event.track.onunmute = () => onRemoteTrackMuted?.(event.track.kind, false);
     };
 
     conn.onconnectionstatechange = () => {

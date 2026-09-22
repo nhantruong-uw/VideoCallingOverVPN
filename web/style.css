@@ -136,20 +136,13 @@ body {
 
 .stage {
     flex: 1;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    justify-content: center;
-    align-content: center;
-    gap: 20px;
+    position: relative;
     padding: 24px;
-    overflow: auto;
+    overflow: hidden;
 }
 
 .tile {
     position: relative;
-    aspect-ratio: 16 / 9;
-    max-width: 640px;
-    justify-self: center;
     background: var(--bg-panel);
     border: 1px solid var(--accent-dim);
     border-radius: 4px;
@@ -160,8 +153,47 @@ body {
 .tile video {
     width: 100%;
     height: 100%;
-    object-fit: cover;
     display: block;
+}
+
+.tile-primary {
+    position: absolute;
+    inset: 24px;
+}
+
+.tile-primary video {
+    object-fit: contain;
+}
+
+.tile-corner {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    width: 200px;
+    aspect-ratio: 16 / 9;
+    z-index: 2;
+}
+
+.tile-corner video {
+    object-fit: cover;
+}
+
+.primary-placeholder[hidden] {
+    display: none;
+}
+
+.primary-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    pointer-events: none;
 }
 
 .tile::before,
@@ -185,6 +217,10 @@ body {
     right: 0;
     border-bottom: 2px solid var(--accent);
     border-right: 2px solid var(--accent);
+}
+
+.tile-label[hidden] {
+    display: none;
 }
 
 .tile-label {

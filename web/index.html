@@ -22,7 +22,13 @@
             </aside>
 
             <main class="stage" id="stage">
-                <div class="tile" id="tile-local">
+                <div class="tile tile-primary" id="primaryTile">
+                    <video id="remoteVideo" autoplay playsinline></video>
+                    <div class="tile-label" id="remoteLabel" hidden><span class="live-dot"></span>Peer</div>
+                    <p class="primary-placeholder" id="primaryPlaceholder">Waiting for a call&hellip;</p>
+                </div>
+
+                <div class="tile tile-corner" id="tile-local">
                     <video id="localVideo" autoplay muted playsinline></video>
                     <div class="tile-label"><span class="live-dot"></span>You</div>
                 </div>
@@ -62,7 +68,9 @@
 
         const statusEl = document.getElementById("status");
         const videoEl = document.getElementById("localVideo");
-        const stageEl = document.getElementById("stage");
+        const remoteVideoEl = document.getElementById("remoteVideo");
+        const remoteLabelEl = document.getElementById("remoteLabel");
+        const primaryPlaceholderEl = document.getElementById("primaryPlaceholder");
         const rosterListEl = document.getElementById("rosterList");
         const nameInput = document.getElementById("nameInput");
         const cameraSelect = document.getElementById("cameraSelect");
@@ -123,34 +131,23 @@
                 });
         }
 
-        const remoteTiles = new Map();
-
-        function addRemoteTile(stream) {
-            if (remoteTiles.has(stream.id)) return;
-
-            const tile = document.createElement("div");
-            tile.className = "tile";
-
-            const video = document.createElement("video");
-            video.autoplay = true;
-            video.playsInline = true;
-            video.srcObject = stream;
-
-            const label = document.createElement("div");
-            label.className = "tile-label";
-            label.innerHTML = '<span class="live-dot"></span>Peer';
-
-            tile.appendChild(video);
-            tile.appendChild(label);
-            stageEl.appendChild(tile);
-
-            remoteTiles.set(stream.id, tile);
+        function showRemoteStream(stream) {
+            remoteVideoEl.srcObject = stream;
+            remoteLabelEl.hidden = false;
+            primaryPlaceholderEl.hidden = true;
         }
 
-        function clearRemoteTiles() {
-            remoteTiles.forEach((tile) => tile.remove());
-            remoteTiles.clear();
+        function clearRemoteStream() {
+            remoteVideoEl.srcObject = null;
+            remoteLabelEl.hidden = true;
+            primaryPlaceholderEl.hidden = false;
             statusEl.textContent = "The other person disconnected.";
+        }
+
+        function onRemoteTrackMuted(kind, muted) {
+            statusEl.textContent = muted
+                ? `Peer's ${kind} is having trouble reaching you...`
+                : "";
         }
 
         async function start(constraints) {
@@ -187,8 +184,7 @@
             stopCapture();
             hangup();
             videoEl.srcObject = null;
-            remoteTiles.forEach((tile) => tile.remove());
-            remoteTiles.clear();
+            clearRemoteStream();
             muteBtn.textContent = "Mute";
             cameraBtn.textContent = "Turn Camera Off";
             disconnectBtn.textContent = "Start Camera";
@@ -217,22 +213,30 @@
         }
 
         function selectedConstraints() {
+            const video = {
+                width: { ideal: 1280, max: 1280 },
+                height: { ideal: 720, max: 720 },
+                frameRate: { ideal: 30, max: 30 },
+            };
+            if (cameraSelect.value) video.deviceId = { exact: cameraSelect.value };
+
             return {
-                video: cameraSelect.value ? { deviceId: { exact: cameraSelect.value } } : true,
+                video,
                 audio: micSelect.value ? { deviceId: { exact: micSelect.value } } : true,
             };
         }
 
-        await start({ video: true, audio: true });
+        await start(selectedConstraints());
         await populateDeviceLists();
 
         try {
             await connectSignaling({
-                onRemoteStream: addRemoteTile,
-                onCallEnded: clearRemoteTiles,
+                onRemoteStream: showRemoteStream,
+                onCallEnded: clearRemoteStream,
                 onRoster: renderRoster,
                 onWelcome: (id) => { selfId = id; },
                 onSignalingClosed: () => setSelfOnline(false),
+                onRemoteTrackMuted,
             });
         } catch (err) {
             console.error(err);
