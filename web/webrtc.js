@@ -126,6 +126,11 @@ function createPeerConnection() {
             startQualityMonitor(conn);
         } else if (conn.connectionState === "disconnected" || conn.connectionState === "failed") {
             stopQualityMonitor();
+            conn.close();
+            if (pc === conn) {
+                pc = null;
+                remoteId = null;
+            }
             onCallEnded?.();
         } else if (conn.connectionState === "closed") {
             stopQualityMonitor();
