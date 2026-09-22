@@ -5,6 +5,8 @@
         const videoEl = document.getElementById("localVideo");
         const cameraSelect = document.getElementById("cameraSelect");
         const micSelect = document.getElementById("micSelect");
+        const muteBtn = document.getElementById("muteBtn");
+        const cameraBtn = document.getElementById("cameraBtn");
 
         let currentStream = null;
 
@@ -19,6 +21,8 @@
                 currentStream = stream;
                 videoEl.srcObject = stream;
                 statusEl.textContent = "";
+                muteBtn.textContent = "Mute";
+                cameraBtn.textContent = "Turn Camera Off";
             } catch (err) {
                 console.error(err);
 
@@ -67,6 +71,22 @@
 
         cameraSelect.addEventListener("change", () => startStream(selectedConstraints()));
         micSelect.addEventListener("change", () => startStream(selectedConstraints()));
+
+        muteBtn.addEventListener("click", () => {
+            const audioTrack = currentStream?.getAudioTracks()[0];
+            if (!audioTrack) return;
+
+            audioTrack.enabled = !audioTrack.enabled;
+            muteBtn.textContent = audioTrack.enabled ? "Mute" : "Unmute";
+        });
+
+        cameraBtn.addEventListener("click", () => {
+            const videoTrack = currentStream?.getVideoTracks()[0];
+            if (!videoTrack) return;
+
+            videoTrack.enabled = !videoTrack.enabled;
+            cameraBtn.textContent = videoTrack.enabled ? "Turn Camera Off" : "Turn Camera On";
+        });
     </script>
     <body>
         <video id="localVideo" autoplay muted playsinline></video>
@@ -80,5 +100,8 @@
             Microphone:
             <select id="micSelect"></select>
         </label>
+
+        <button id="muteBtn">Mute</button>
+        <button id="cameraBtn">Turn Camera Off</button>
     </body>
 </html>
