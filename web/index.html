@@ -183,6 +183,16 @@
             statusEl.textContent = "Peer is busy.";
         }
 
+        function onNoAnswer() {
+            statusEl.textContent = "No answer.";
+        }
+
+        function onMissedCall(callerId) {
+            const caller = lastRosterPeers.find((peer) => peer.id === callerId);
+            incomingCallBannerEl.hidden = true;
+            statusEl.textContent = `Missed call from ${caller?.name ?? `Peer ${callerId}`}.`;
+        }
+
         function onIncomingCall(callerId) {
             const caller = lastRosterPeers.find((peer) => peer.id === callerId);
             incomingCallTextEl.textContent = `Incoming call from ${caller?.name ?? `Peer ${callerId}`}...`;
@@ -323,6 +333,8 @@
                 onCallRejected,
                 onCallRinging,
                 onCallBusy,
+                onNoAnswer,
+                onMissedCall,
             });
         } catch (err) {
             console.error(err);

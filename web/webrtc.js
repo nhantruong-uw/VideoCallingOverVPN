@@ -16,8 +16,13 @@ let onIncomingCall = null;
 let onCallRejected = null;
 let onCallRinging = null;
 let onCallBusy = null;
+let onNoAnswer = null;
+let onMissedCall = null;
 let pendingOffer = null;
 let pendingCandidates = [];
+let callTimeoutId = null;
+
+const CALL_TIMEOUT_MS = 10000;
 
 function send(msg) {
     ws.send(JSON.stringify(msg));
@@ -36,6 +41,8 @@ export function connectSignaling({
     onCallRejected: rejectedCb,
     onCallRinging: ringingCb,
     onCallBusy: busyCb,
+    onNoAnswer: noAnswerCb,
+    onMissedCall: missedCb,
 } = {}) {
     onRemoteStream = cb;
     onCallEnded = endedCb;
@@ -49,6 +56,8 @@ export function connectSignaling({
     onCallRejected = rejectedCb;
     onCallRinging = ringingCb;
     onCallBusy = busyCb;
+    onNoAnswer = noAnswerCb;
+    onMissedCall = missedCb;
 
     return new Promise((resolve, reject) => {
         ws = new WebSocket(`wss://${location.host}/ws`);
@@ -135,6 +144,7 @@ export function identify(name) {
 
 export function hangup() {
     stopQualityMonitor();
+    clearTimeout(callTimeoutId);
     if (remoteId !== null) {
         send({ type: "hangup", sender: 0, target: remoteId, payload: {} });
     }
@@ -186,6 +196,14 @@ export async function call(targetId) {
     await pc.setLocalDescription(offer);
 
     send({ type: "offer", sender: 0, target: remoteId, payload: pc.localDescription });
+
+    callTimeoutId = setTimeout(() => {
+        send({ type: "timeout", sender: 0, target: remoteId, payload: {} });
+        pc?.close();
+        pc = null;
+        remoteId = null;
+        onNoAnswer?.();
+    }, CALL_TIMEOUT_MS);
 }
 
 async function handleSignal(msg) {
@@ -200,6 +218,7 @@ async function handleSignal(msg) {
         pendingCandidates = [];
         onIncomingCall?.(msg.sender);
     } else if (msg.type === "answer") {
+        clearTimeout(callTimeoutId);
         await pc.setRemoteDescription(new RTCSessionDescription(msg.payload));
         for (const candidate of pendingCandidates) {
             await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -212,6 +231,7 @@ async function handleSignal(msg) {
             pendingCandidates.push(msg.payload);
         }
     } else if (msg.type === "reject") {
+        clearTimeout(callTimeoutId);
         pc?.close();
         pc = null;
         remoteId = null;
@@ -231,9 +251,18 @@ async function handleSignal(msg) {
     } else if (msg.type === "media-state") {
         onPeerMediaState?.(msg.payload.kind, msg.payload.enabled);
     } else if (msg.type === "busy") {
+        clearTimeout(callTimeoutId);
         pc?.close();
         pc = null;
         remoteId = null;
         onCallBusy?.();
+    } else if (msg.type === "timeout") {
+        stopQualityMonitor();
+        pc?.close();
+        pc = null;
+        remoteId = null;
+        pendingOffer = null;
+        pendingCandidates = [];
+        onMissedCall?.(msg.sender);
     }
 }

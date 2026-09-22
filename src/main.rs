@@ -39,6 +39,7 @@ enum MessageType {
     Reject,
     Hangup,
     Busy,
+    Timeout,
 }
 
 #[derive(Serialize, Deserialize)]
