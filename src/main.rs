@@ -18,7 +18,13 @@ use std::net::SocketAddr;
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
 type ClientId = u64;
-type SharedState = Arc<Mutex<HashMap<ClientId, UnboundedSender<Message>>>>;
+
+struct ClientInfo {
+    name: String,
+    tx: Option<UnboundedSender<Message>>,
+}
+
+type SharedState = Arc<Mutex<HashMap<ClientId, ClientInfo>>>;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
@@ -26,6 +32,8 @@ enum MessageType {
     Offer,
     Answer,
     IceCandidate,
+    Identify,
+    Roster,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -35,6 +43,46 @@ struct SignalMessage {
     sender: ClientId,
     target: ClientId,
     payload: serde_json::Value,
+}
+
+#[derive(Serialize, Deserialize)]
+struct IdentifyPayload {
+    name: String,
+}
+
+#[derive(Serialize)]
+struct RosterEntry {
+    id: ClientId,
+    name: String,
+    online: bool,
+}
+
+fn broadcast_roster(state: &SharedState) {
+    let map = state.lock().unwrap();
+
+    let peers: Vec<RosterEntry> = map
+        .iter()
+        .map(|(&id, info)| RosterEntry {
+            id,
+            name: info.name.clone(),
+            online: info.tx.is_some(),
+        })
+        .collect();
+
+    let payload = serde_json::to_value(&peers).unwrap();
+
+    for info in map.values() {
+        if let Some(tx) = &info.tx {
+            let msg = SignalMessage {
+                msg_type: MessageType::Roster,
+                sender: 0,
+                target: 0,
+                payload: payload.clone(),
+            };
+            let text = serde_json::to_string(&msg).unwrap();
+            let _ = tx.send(Message::Text(text.into()));
+        }
+    }
 }
 
 #[tokio::main]
@@ -68,9 +116,15 @@ async fn ws_handler(State(state): State<SharedState>, ws: WebSocketUpgrade) -> i
 async fn handle_socket(mut socket: WebSocket, state: SharedState) {
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
-    // let tx_clone = tx.clone();
-    state.lock().unwrap().insert(id, tx);
-    tracing::info!("client connected");
+    state.lock().unwrap().insert(
+        id,
+        ClientInfo {
+            name: format!("Peer {id}"),
+            tx: Some(tx),
+        },
+    );
+    tracing::info!("client connected: id={id}");
+    broadcast_roster(&state);
 
     let (mut sender, mut receiver) = socket.split();
 
@@ -86,13 +140,28 @@ async fn handle_socket(mut socket: WebSocket, state: SharedState) {
         if let Message::Text(text) = &msg {
             match serde_json::from_str::<SignalMessage>(text) {
                 Ok(mut signal) => {
-                    // good signal
                     signal.sender = id;
-                    tracing::info!("relaying {:?} from {} to {}", 
+
+                    if let MessageType::Identify = signal.msg_type {
+                        match serde_json::from_value::<IdentifyPayload>(signal.payload) {
+                            Ok(identify) => {
+                                if let Some(info) = state.lock().unwrap().get_mut(&id) {
+                                    info.name = identify.name;
+                                }
+                                broadcast_roster(&state);
+                            }
+                            Err(e) => {
+                                tracing::warn!("failed to parse identify payload: {e}");
+                            }
+                        }
+                        continue;
+                    }
+
+                    tracing::info!("relaying {:?} from {} to {}",
                         signal.msg_type, id, signal.target);
                     let pkg = Message::Text(serde_json::to_string(&signal).unwrap().into());
                     let map = state.lock().unwrap();
-                    let other_tx = map.get(&signal.target);
+                    let other_tx = map.get(&signal.target).and_then(|info| info.tx.as_ref());
                     match other_tx {
                         Some(tx) => {
                             if tx.send(pkg).is_err() {
@@ -112,6 +181,9 @@ async fn handle_socket(mut socket: WebSocket, state: SharedState) {
         }
     }
 
-    state.lock().unwrap().remove(&id);
-    tracing::info!("client disconnected");
+    if let Some(info) = state.lock().unwrap().get_mut(&id) {
+        info.tx = None;
+    }
+    tracing::info!("client disconnected: id={id}");
+    broadcast_roster(&state);
 }

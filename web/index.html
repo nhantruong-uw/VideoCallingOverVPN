@@ -15,14 +15,25 @@
             <p class="status-line" id="status"></p>
         </div>
 
-        <main class="stage" id="stage">
-            <div class="tile" id="tile-local">
-                <video id="localVideo" autoplay muted playsinline></video>
-                <div class="tile-label"><span class="live-dot"></span>You</div>
-            </div>
-        </main>
+        <div class="body">
+            <aside class="sidebar">
+                <h2>Peers</h2>
+                <ul id="rosterList"></ul>
+            </aside>
+
+            <main class="stage" id="stage">
+                <div class="tile" id="tile-local">
+                    <video id="localVideo" autoplay muted playsinline></video>
+                    <div class="tile-label"><span class="live-dot"></span>You</div>
+                </div>
+            </main>
+        </div>
 
         <footer class="controls">
+            <div class="control-group">
+                <label for="nameInput">Name</label>
+                <input type="text" id="nameInput" placeholder="Your name">
+            </div>
             <div class="control-group">
                 <label for="cameraSelect">Camera</label>
                 <select id="cameraSelect"></select>
@@ -34,21 +45,86 @@
             <div class="control-group">
                 <button id="muteBtn">Mute</button>
                 <button id="cameraBtn">Turn Camera Off</button>
-                <button id="stopBtn">Stop Camera</button>
+                <button id="disconnectBtn">Disconnect</button>
+            </div>
+            <div class="control-group">
+                <label for="targetInput">Target ID</label>
+                <input type="number" id="targetInput" min="0" step="1">
+                <button id="callBtn" disabled>Call</button>
             </div>
         </footer>
     </div>
 
     <script type="module">
-        import { startCapture, stopCapture, toggleAudio, toggleVideo, listDevices } from "./capture.js";
+        import { startCapture, stopCapture, getCurrentStream, toggleAudio, toggleVideo, listDevices } from "./capture.js";
+        import { connectSignaling, call, hangup, identify } from "./webrtc.js";
 
         const statusEl = document.getElementById("status");
         const videoEl = document.getElementById("localVideo");
+        const stageEl = document.getElementById("stage");
+        const rosterListEl = document.getElementById("rosterList");
+        const nameInput = document.getElementById("nameInput");
         const cameraSelect = document.getElementById("cameraSelect");
         const micSelect = document.getElementById("micSelect");
         const muteBtn = document.getElementById("muteBtn");
         const cameraBtn = document.getElementById("cameraBtn");
-        const stopBtn = document.getElementById("stopBtn");
+        const disconnectBtn = document.getElementById("disconnectBtn");
+        const targetInput = document.getElementById("targetInput");
+        const callBtn = document.getElementById("callBtn");
+
+        function renderRoster(peers) {
+            rosterListEl.innerHTML = "";
+
+            peers
+                .sort((a, b) => a.id - b.id)
+                .forEach((peer) => {
+                    const li = document.createElement("li");
+                    li.className = "roster-item";
+
+                    const dot = document.createElement("span");
+                    dot.className = `status-dot ${peer.online ? "online" : "offline"}`;
+
+                    li.appendChild(dot);
+                    li.append(`${peer.name} `);
+
+                    const idEl = document.createElement("span");
+                    idEl.className = "roster-id";
+                    idEl.textContent = `#${peer.id}`;
+                    li.appendChild(idEl);
+
+                    rosterListEl.appendChild(li);
+                });
+        }
+
+        const remoteTiles = new Map();
+
+        function addRemoteTile(stream) {
+            if (remoteTiles.has(stream.id)) return;
+
+            const tile = document.createElement("div");
+            tile.className = "tile";
+
+            const video = document.createElement("video");
+            video.autoplay = true;
+            video.playsInline = true;
+            video.srcObject = stream;
+
+            const label = document.createElement("div");
+            label.className = "tile-label";
+            label.innerHTML = '<span class="live-dot"></span>Peer';
+
+            tile.appendChild(video);
+            tile.appendChild(label);
+            stageEl.appendChild(tile);
+
+            remoteTiles.set(stream.id, tile);
+        }
+
+        function clearRemoteTiles() {
+            remoteTiles.forEach((tile) => tile.remove());
+            remoteTiles.clear();
+            statusEl.textContent = "The other person disconnected.";
+        }
 
         async function start(constraints) {
             try {
@@ -62,6 +138,7 @@
                 statusEl.textContent = "";
                 muteBtn.textContent = "Mute";
                 cameraBtn.textContent = "Turn Camera Off";
+                disconnectBtn.textContent = "Disconnect";
             } catch (err) {
                 console.error(err);
 
@@ -79,12 +156,16 @@
             }
         }
 
-        function stop() {
+        function disconnect() {
             stopCapture();
+            hangup();
             videoEl.srcObject = null;
-            statusEl.textContent = "Camera and microphone stopped.";
+            remoteTiles.forEach((tile) => tile.remove());
+            remoteTiles.clear();
             muteBtn.textContent = "Mute";
             cameraBtn.textContent = "Turn Camera Off";
+            disconnectBtn.textContent = "Start Camera";
+            statusEl.textContent = "Disconnected.";
         }
 
         async function populateDeviceLists() {
@@ -118,6 +199,20 @@
         await start({ video: true, audio: true });
         await populateDeviceLists();
 
+        try {
+            await connectSignaling({ onRemoteStream: addRemoteTile, onCallEnded: clearRemoteTiles, onRoster: renderRoster });
+            callBtn.disabled = false;
+        } catch (err) {
+            console.error(err);
+            statusEl.textContent = "Could not connect to the signaling server.";
+        }
+
+        callBtn.addEventListener("click", () => {
+            const targetId = parseInt(targetInput.value, 10);
+            if (Number.isNaN(targetId)) return;
+            call(targetId);
+        });
+
         cameraSelect.addEventListener("change", () => start(selectedConstraints()));
         micSelect.addEventListener("change", () => start(selectedConstraints()));
 
@@ -133,7 +228,22 @@
             cameraBtn.textContent = enabled ? "Turn Camera Off" : "Turn Camera On";
         });
 
-        stopBtn.addEventListener("click", stop);
+        disconnectBtn.addEventListener("click", () => {
+            if (getCurrentStream()) {
+                disconnect();
+            } else {
+                start(selectedConstraints());
+            }
+        });
+
+        nameInput.addEventListener("change", () => {
+            const name = nameInput.value.trim();
+            if (name) identify(name);
+        });
+
+        nameInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") nameInput.blur();
+        });
     </script>
 </body>
 </html>
