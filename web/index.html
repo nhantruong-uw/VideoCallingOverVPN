@@ -22,6 +22,10 @@
             </aside>
 
             <main class="stage" id="stage">
+                <div class="incoming-call-banner" id="incomingCallBanner" hidden>
+                    <span id="incomingCallText"></span>
+                </div>
+
                 <div class="tile tile-primary" id="primaryTile">
                     <video id="remoteVideo" autoplay playsinline></video>
                     <div class="tile-label" id="remoteLabel" hidden><span class="live-dot"></span>Peer</div>
@@ -83,6 +87,8 @@
         const selfOnlineTextEl = document.getElementById("selfOnlineText");
         const selfStatusDotEl = document.getElementById("selfStatusDot");
         const selfQualityDotEl = document.getElementById("selfQualityDot");
+        const incomingCallBannerEl = document.getElementById("incomingCallBanner");
+        const incomingCallTextEl = document.getElementById("incomingCallText");
 
         let selfId = null;
         let lastRosterPeers = [];
@@ -157,15 +163,23 @@
             remoteVideoEl.srcObject = stream;
             remoteLabelEl.hidden = false;
             primaryPlaceholderEl.hidden = true;
+            incomingCallBannerEl.hidden = true;
             peerAudioEnabled = true;
             peerVideoEnabled = true;
             updateRemoteLabel();
+        }
+
+        function onIncomingCall(callerId) {
+            const caller = lastRosterPeers.find((peer) => peer.id === callerId);
+            incomingCallTextEl.textContent = `Incoming call from ${caller?.name ?? `Peer ${callerId}`}...`;
+            incomingCallBannerEl.hidden = false;
         }
 
         function clearRemoteStream() {
             remoteVideoEl.srcObject = null;
             remoteLabelEl.hidden = true;
             primaryPlaceholderEl.hidden = false;
+            incomingCallBannerEl.hidden = true;
             statusEl.textContent = "The other person disconnected.";
         }
 
@@ -286,6 +300,7 @@
                 onRemoteTrackMuted,
                 onPeerMediaState,
                 onQualityChange,
+                onIncomingCall,
             });
         } catch (err) {
             console.error(err);

@@ -12,6 +12,7 @@ let onRemoteTrackMuted = null;
 let onPeerMediaState = null;
 let onQualityChange = null;
 let qualityInterval = null;
+let onIncomingCall = null;
 
 function send(msg) {
     ws.send(JSON.stringify(msg));
@@ -26,6 +27,7 @@ export function connectSignaling({
     onRemoteTrackMuted: trackMutedCb,
     onPeerMediaState: mediaStateCb,
     onQualityChange: qualityCb,
+    onIncomingCall: incomingCb,
 } = {}) {
     onRemoteStream = cb;
     onCallEnded = endedCb;
@@ -35,6 +37,7 @@ export function connectSignaling({
     onRemoteTrackMuted = trackMutedCb;
     onPeerMediaState = mediaStateCb;
     onQualityChange = qualityCb;
+    onIncomingCall = incomingCb;
 
     return new Promise((resolve, reject) => {
         ws = new WebSocket(`wss://${location.host}/ws`);
@@ -144,6 +147,7 @@ export async function call(targetId) {
 async function handleSignal(msg) {
     if (msg.type === "offer") {
         remoteId = msg.sender;
+        onIncomingCall?.(msg.sender);
         pc = createPeerConnection();
 
         await pc.setRemoteDescription(new RTCSessionDescription(msg.payload));
