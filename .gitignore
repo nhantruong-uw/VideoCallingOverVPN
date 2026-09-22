@@ -4,6 +4,7 @@
 
 # Environment / secrets
 .env
+certs/
 
 # Editor
 .vscode/

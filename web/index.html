@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+    <script type="module">
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true});
+        document.getElementById("localVideo").srcObject = stream;
+    </script>
+    <body>
+        <video id="localVideo" autoplay muted playsinline>
+
+        </video>
+    </body>
+</html>

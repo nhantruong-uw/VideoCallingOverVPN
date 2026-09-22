@@ -12,6 +12,8 @@ use axum::extract::State;
 use futures_util::{SinkExt, StreamExt};
 use serde::{Serialize, Deserialize};
 use tower_http::services::ServeDir;
+use axum_server::tls_rustls::RustlsConfig;
+use std::net::SocketAddr;
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -46,12 +48,17 @@ async fn main() {
         .with_state(state)
         .fallback_service(ServeDir::new("web"));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    let tls_config = RustlsConfig::from_pem_file("certs/cert.pem", "certs/key.pem")
         .await
         .unwrap();
-    tracing::info!("signaling server listening on {}", listener.local_addr().unwrap());
 
-    axum::serve(listener, app).await.unwrap();
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    tracing::info!("signaling server listening on https://{addr}");
+
+    axum_server::bind_rustls(addr, tls_config)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
 
 async fn ws_handler(State(state): State<SharedState>, ws: WebSocketUpgrade) -> impl IntoResponse {
