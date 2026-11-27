@@ -106,7 +106,11 @@ async fn main() {
         .await
         .unwrap();
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr: SocketAddr = std::env::var("SPECTRE_ADDR")
+    .unwrap_or_else(|_| "127.0.0.1:3000".to_string())
+    .parse()
+    .expect("SPECTRE_ADDR must look like 10.0.0.1:3000");
+
     tracing::info!("signaling server listening on https://{addr}");
 
     axum_server::bind_rustls(addr, tls_config)
